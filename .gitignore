@@ -1,2 +1,5 @@
 TensorTrain/bk.py
+TensorTrain/.idea*
+
+.idea/*
 
