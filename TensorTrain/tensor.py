@@ -1,5 +1,8 @@
 import numpy as np
 from numpy.linalg import matrix_rank, inv
+import bunch_kaufman
+from scipy.linalg import pinv
+from tensorly import unfold
 
 
 class Tensor:
@@ -37,8 +40,6 @@ class Tensor:
 
     def low_rank_approximation(self, A, delta, factor='svd'):
         assert(factor in ['svd', 'aca'])
-        if factor == 'Bunch-Kaufman':
-            C, G, R = self.Bunch_Kaufman(A, delta)
 
         if factor == 'svd':
             U, S, Vt = np.linalg.svd(A, full_matrices=False)
@@ -56,31 +57,12 @@ class Tensor:
             rk = np.min(G.shape)
             return C[:, :rk], inv(G[:rk, :rk]), R[:rk, :], rk
 
-    def Bunch_Kaufman(self, A, eps, alpha=(1 + 17 ** 0.5) / 8):
-        S = np.dot(A, A.transpose())
-        P = np.array([i for i in range(S.shape[0])])
-        L = np.identity(S.shape[0])
-        pivots = []
-
-        def pivot_1(i):
-            L[i + 1:, i] = S[i + 1:, i] / S[i, i]
-            S[i + 1:, i + 1:] -= L[i + 1:, i]*S[i + 1:, i].T
-            pivots.append(1)
-
-        def pivot_2():
-            pass
-
-        def exchange_rows_cols(i, j):
-             S[:, [i, j]] = S[:, [i, j]]
-             S[[i, j], :] = S[[i, j], :]
-
-        pass    # todo finish
-
     def adaptive_cross_approximation(self, A, eps):
             R = [A]
             I = []
             J = []
             k = 0
+
             while self.frobenius_norm(R[k]) > eps*self.frobenius_norm(A) or k == 0:
                 k += 1
                 ij = np.where(np.abs(R[k - 1]) == np.abs(R[k - 1]).max())
@@ -105,3 +87,57 @@ class Tensor:
                 for l in range(len(J)):
                     G[k][l] = A[I[k]][J[l]]
             return C, G, R_
+
+    def init_factors(self, N, rank, mod):
+        As_init = [None] * N
+        if mod == 'random':
+            for i in range(N):
+                As_init[i] = np.array(np.random.rand(self.T.shape[i], rank), dtype=np.float32)
+
+        return As_init
+
+    def khatrirao(self, As):
+        N = As[0].shape[1]
+        M = 1
+        for i in range(len(As)):
+            M *= As[i].shape[0]
+        order = np.arange(len(As))
+
+        # preallocate
+        P = np.zeros((M, N), dtype=As[0].dtype)
+        for n in range(N):
+            ab = As[order[0]][:, n]
+            for j in range(1, len(order)):
+                ab = np.kron(ab, As[order[j]][:, n])
+            P[:, n] = ab
+        return P
+
+    def uttkrp(self, As, n):
+        order = list(range(n)) + list(range(n + 1, self.T.ndim))
+        Z = self.khatrirao(tuple(As[i] for i in order)) #reverse???
+        return unfold(self.T, n).dot(Z)
+
+    def cp_als(self, rank, init='random', maxiter=300):
+        N = self.T.ndim
+        As = self.init_factors(N, rank, init)
+        iter = 0
+        lambdas = np.ones(rank)
+
+        while iter < maxiter:
+            iter += 1
+
+            for n in range(N):
+                V = self.uttkrp(As, n)
+                Z = np.ones((rank, rank), dtype=np.float32)
+                for i in (list(range(n)) + list(range(n + 1, N))):
+                    Z = Z * np.dot(As[i].T, As[i])
+                A_cur = np.dot(V, pinv(Z))  # solve AZ=V
+
+                # normalize A update lambdas
+                if iter == 0:
+                    lambdas = np.sqrt((A_cur ** 2).sum(axis=0))
+                else:
+                    lambdas = A_cur.max(axis=0)
+                    lambdas[lambdas < 1] = 1
+                As[n] = A_cur / lambdas
+        return As, lambdas
