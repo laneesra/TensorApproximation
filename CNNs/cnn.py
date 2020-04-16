@@ -10,7 +10,6 @@ import torch.cuda as cuda
 import torch.tensor as torch_tensor
 sys.path.append("/home/laneesra/PycharmProjects/Diplom/TensorTrain")
 from tensor import Tensor
-from tensorly.decomposition import parafac, partial_tucker
 
 
 class CNN:
@@ -31,22 +30,24 @@ class CNN:
 
         with open('/home/laneesra/PycharmProjects/Diplom/CNNs/data/imagenet_classes.txt') as f:
             self.labels = [line.strip() for line in f.readlines()]
-        '''if self.verbose:
+        if self.verbose:
             print('========ImageNet classes========')
             print(self.labels)
-            print('================================')'''
+            print('================================')
 
     def run(self):
         self.model.eval()
         self.model.cpu()
 
     def get_summary(self):
-        for name, param in self.model.named_parameters():
+        summary(self.model, (3, 224, 224), device='cpu')
+
+        '''for name, param in self.model.named_parameters():
             print('name: ', name)
             print(type(param))
             print('param.shape: ', param.shape)
             print('param.requires_grad: ', param.requires_grad)
-            print('=====')
+            print('=====')'''
 
     def get_conv_layers(self):
         N = len(self.model.features._modules.keys())
@@ -72,7 +73,15 @@ class CNN:
         print()
         if self.factorization == 'cp':
             rk = max(weight_tensor.T.shape) // 3
-            lambdas, Us = weight_tensor.cp_als(rk, init='random', ret_tensors=True)
+            lambdas, Us = weight_tensor.cp_rand(rk, init='random', ret_tensors=True)
+            decomposed = np.zeros(weight_tensor.T.shape)
+            for i in range(rk):
+                tmp = lambdas[i] * Us[0][:, i]
+                for j in range(1, len(Us)):
+                    tmp = np.multiply.outer(tmp, Us[j][:, i])
+                decomposed += tmp
+            print('=========error============')
+            print(weight_tensor.frobenius_norm(decomposed - weight_tensor.T))
             last, first, vertical, horizontal = Us
 
             f_x = (np.array(horizontal) * lambdas).T
@@ -138,13 +147,7 @@ class CNN:
         return decomposed
 
     def fine_tune(self):
-        base_model = torch.load("decomposed_model")
-        model = torch.nn.DataParallel(base_model)
-
-        for param in model.parameters():
-            param.requires_grad = True
-
-        print(model)
+        pass
 
     def predict(self, batch):
         preds = self.model(batch)
@@ -154,8 +157,9 @@ class CNN:
 
     def predict_decomposed(self, batch):
         self.model = torch.load("decomposed_model")
-       # summary(self.model, (3, 224, 224))
         self.run()
+        #self.get_summary()
+        summary(self.model, (3, 224, 224), device='cpu')
         preds = self.model(batch)
         _, index = torch.max(preds, 1)
         percentage = nn.functional.softmax(preds, dim=1)[0] * 100
