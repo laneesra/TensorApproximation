@@ -3,6 +3,16 @@ from numpy.linalg import matrix_rank, inv
 import bunch_kaufman
 from scipy.linalg import pinv
 from tensorly import unfold
+import time
+
+
+def timeit(func):
+    def timer(*args, **kwargs):
+        start = time.time()
+        res = func(*args, **kwargs)
+        print('{} in {} secs'. format(func.__name__, time.time() - start))
+        return res
+    return timer
 
 
 class Tensor:
@@ -12,6 +22,7 @@ class Tensor:
     def frobenius_norm(self, A):
         return np.sum(np.sum(A * A)) ** 0.5
 
+    @timeit
     def tt_factorization(self, eps, factor='svd'):
         d = len(self.T.shape)
         N = self.T.size
@@ -58,52 +69,53 @@ class Tensor:
             return C[:, :rk], inv(G[:rk, :rk]), R[:rk, :], rk
 
     def adaptive_cross_approximation(self, A, eps):
-            R = [A]
-            I = []
-            J = []
-            k = 0
+        R = [A]
+        I = []
+        J = []
+        k = 0
 
-            while self.frobenius_norm(R[k]) > eps*self.frobenius_norm(A) or k == 0:
-                k += 1
-                ij = np.where(np.abs(R[k - 1]) == np.abs(R[k - 1]).max())
-                i, j = ij[0][0], ij[1][0]
-                delta = R[k - 1][i, j]
-                if delta == 0:
-                    break
-                I.append(i)
-                J.append(j)
+        while self.frobenius_norm(R[k]) > eps*self.frobenius_norm(A) or k == 0:
+            k += 1
+            ij = np.where(np.abs(R[k - 1]) == np.abs(R[k - 1]).max())
+            i, j = ij[0][0], ij[1][0]
+            delta = R[k - 1][i, j]
+            if delta == 0:
+                break
+            I.append(i)
+            J.append(j)
 
-                u = np.array([R[k - 1][:, j]])
-                v = np.array([R[k - 1][i, :]]) / delta
-                R.append(R[k - 1] - np.matmul(u.T, v))
+            u = np.array([R[k - 1][:, j]])
+            v = np.array([R[k - 1][i, :]]) / delta
+            R.append(R[k - 1] - np.matmul(u.T, v))
 
-            C = np.zeros((A.shape[0], len(J)))
-            G = np.zeros((len(I), len(J)))
-            R_ = np.zeros((len(I), A.shape[1]))
+        C = np.zeros((A.shape[0], len(J)))
+        G = np.zeros((len(I), len(J)))
+        R_ = np.zeros((len(I), A.shape[1]))
 
-            for k in range(len(I)):
-                C[:, k] = A[:, J[k]]
-                R_[k, :] = A[I[k], :]
-                for l in range(len(J)):
-                    G[k][l] = A[I[k]][J[l]]
-            return C, G, R_
+        for k in range(len(I)):
+            C[:, k] = A[:, J[k]]
+            R_[k, :] = A[I[k], :]
+            for l in range(len(J)):
+                G[k][l] = A[I[k]][J[l]]
+        return C, G, R_
 
     def init_factors(self, N, rank, mod):
         As_init = [None] * N
         if mod == 'random':
             for i in range(N):
-                As_init[i] = np.array(np.random.rand(self.T.shape[i], rank), dtype=np.float32)
+                As_init[i] = np.array(np.random.rand(self.T.shape[i], rank), dtype='float')
+
+        #elif mod == '':
 
         return As_init
 
-    def khatrirao(self, As):
+    def khatri_rao(self, As):
         N = As[0].shape[1]
         M = 1
         for i in range(len(As)):
             M *= As[i].shape[0]
         order = np.arange(len(As))
 
-        # preallocate
         P = np.zeros((M, N), dtype=As[0].dtype)
         for n in range(N):
             ab = As[order[0]][:, n]
@@ -114,10 +126,11 @@ class Tensor:
 
     def uttkrp(self, As, n):
         order = list(range(n)) + list(range(n + 1, self.T.ndim))
-        Z = self.khatrirao(tuple(As[i] for i in order)) #reverse???
+        Z = self.khatri_rao(tuple(As[i] for i in order)) #reverse???
         return unfold(self.T, n).dot(Z)
 
-    def cp_als(self, rank, init='random', maxiter=300):
+    @timeit
+    def cp_als(self, rank, init='random', ret_tensors=False, maxiter=300):
         N = self.T.ndim
         As = self.init_factors(N, rank, init)
         iter = 0
@@ -140,4 +153,78 @@ class Tensor:
                     lambdas = A_cur.max(axis=0)
                     lambdas[lambdas < 1] = 1
                 As[n] = A_cur / lambdas
-        return As, lambdas
+
+        if ret_tensors:
+            return lambdas, As
+
+        decomposed = np.zeros(self.T.shape)
+        #print('len As', len(As))
+        for a in As:
+            print(a.shape)
+        for i in range(rank):
+            tmp = lambdas[i] * As[0][:, i]
+            for j in range(1, len(As)):
+                tmp = np.multiply.outer(tmp, As[j][:, i])
+            decomposed += tmp
+
+        return decomposed
+
+    def sampled_khatri_rao(self, S, As, n):
+        skr = None
+        matrices = [As[i] for i in range(len(As)) if i != n]
+        for i, (m, A) in enumerate(zip(S, matrices)):
+            if skr is None:
+                skr = A[m, :]
+            else:
+                skr = skr * A[m, :]
+        return skr
+
+    def get_samples(self, As, n, num_samples):
+        samples = [np.random.randint(low=0, high=As[i].shape[0], size=num_samples, dtype=int) for i in range(len(As)) if i != n]
+        return samples
+
+    @timeit
+    def cp_rand(self, rank, init='random', maxiter=300, ret_tensors=False):
+        N = self.T.ndim
+        As = self.init_factors(N, rank, init)
+        iter = 0
+        lambdas = np.ones(rank)
+        num_samples = max(self.T.shape) * 10
+
+        while iter < maxiter:
+            iter += 1
+            for n in range(N):
+                s_idxs = self.get_samples(As, n, num_samples=num_samples)
+                Z = self.sampled_khatri_rao(s_idxs, As, n)
+                s_idxs = [s.tolist() for s in s_idxs]
+                s_idxs.insert(n, slice(None, None, None))
+                s_idxs = tuple(s_idxs)
+                if n:
+                    X_s = self.T[s_idxs]
+                else:
+                    X_s = self.T[s_idxs].T
+                X_s = np.dot(Z.T, X_s)
+                A_cur = (np.dot(pinv(np.dot(Z.T, Z)), X_s)).T
+
+                if iter == 0:
+                    lambdas = np.sqrt((A_cur ** 2).sum(axis=0))
+                else:
+                    lambdas = A_cur.max(axis=0)
+                    lambdas[lambdas < 1] = 1
+                As[n] = A_cur / lambdas
+
+        if ret_tensors:
+            return lambdas, As
+
+        decomposed = np.zeros(self.T.shape)
+        print('len As', len(As))
+        for a in As:
+            print(a.shape)
+        for i in range(rank):
+            tmp = lambdas[i] * As[0][:, i]
+            for j in range(1, len(As)):
+                tmp = np.multiply.outer(tmp, As[j][:, i])
+            decomposed += tmp
+        print('=========error============')
+        print(self.frobenius_norm(decomposed - self.T))
+        return decomposed
