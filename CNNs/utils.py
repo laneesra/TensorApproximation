@@ -23,8 +23,7 @@ class Trainer:
         self.verbose = args.verbose
         self.model = model
         self.path = f'/home/laneesra/PycharmProjects/Diplom/CNNs/models/{args.model}.pth'
-        self.device = torch.device("cuda" if torch.cuda.is_available()
-                              else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if self.verbose:
             print('model {} loaded'.format(args.model))
 
@@ -226,7 +225,7 @@ class Decomposer:
 
             #s y x t
             k_s_layer = torch.nn.Conv2d(in_channels=s, out_channels=rk, kernel_size=1,
-                                        padding=0, bias=False)
+                                        padding=0, stride=1, dilation=layer.dilation, bias=False)
 
             k_y_layer = torch.nn.Conv2d(in_channels=rk, out_channels=rk, kernel_size=(d, 1),
                                         stride=1, padding=(layer.padding[0], 0),
@@ -237,13 +236,13 @@ class Decomposer:
                                         dilation=layer.dilation, groups=rk, bias=False)
 
             k_t_layer = torch.nn.Conv2d(in_channels=rk, out_channels=t, kernel_size=1,
-                                        padding=0, bias=True)
+                                        padding=0, stride=1, dilation=layer.dilation, bias=True)
 
             k_t_layer.bias.data = layer.bias.data
 
-            f_s = np.reshape(f_s, [rk, s, 1, 1])
-            f_y = np.reshape(f_y, [rk, 1, d, 1])
-            f_x = np.reshape(f_x, [rk, 1, 1, d])
+            f_s = np.reshape(f_s.T, [rk, s, 1, 1])
+            f_y = np.reshape(f_y.T, [rk, 1, d, 1])
+            f_x = np.reshape(f_x.T, [rk, 1, 1, d])
             f_t = np.reshape(f_t, [t, rk, 1, 1])
 
             print('shapes', f_s.shape, f_y.shape, f_x.shape, f_t.shape)
