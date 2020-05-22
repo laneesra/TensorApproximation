@@ -2,8 +2,13 @@ import numpy as np
 import time
 from scipy.linalg import inv
 import math
-
+from numpy.linalg import lstsq
+from scipy.linalg import orth
+import seaborn as sns
+import matplotlib.pyplot as plt
+sns.set()
 from tensor import Tensor
+import matplotlib.patches as mpatches
 
 
 def bunch_kaufman(A):
@@ -105,42 +110,68 @@ def sort_by_permutation(d):
         P[p2][p1] = 1
     return P
 
+
+def find_orth(M):
+    rand_vec = np.random.rand(M.shape[0], 1)
+    A = np.hstack((M, rand_vec))
+    b = np.zeros(M.shape[1] + 1)
+    b[-1] = 1.
+    l = lstsq(A.T, b)[0]
+    return l
+
+
 if __name__ == '__main__':
-    A = np.matrix([[6, 2, 3, -6, 1], [5, 6, 2, -1, 2], [-1, 1, 4, 3, -7], [2, 5, 3, -1, 6]], dtype=float)
-    #A = np.matrix([[6, 12, 3, -6], [12, -8 ,-13, 4], [3, -13, -7, 1], [-6, 4, 1, 6]], dtype=float)
+    A = np.matrix(np.random.rand(500, 500))
     S = np.dot(A.H, A)
-    print('S', S)
-    print('shape', A.shape)
+    #print('S', S)
+    #print('shape', A.shape)
     start = time.time()
     D, L, P, pivot = bunch_kaufman(S)
+    test = L @ D @ L.H
+    ll = np.linalg.eig(test)[0]
+    ll = [math.sqrt(ll[i]) for i in range(len(ll)) ]
+    #print('eigen', ll)
+    #print('singular', np.linalg.svd(A)[1])
+
+
     r = np.linalg.matrix_rank(A)
-    print(r)
-    print('BK in {} secs\n'.format(time.time() - start))
+    #print(r)
     S_bk = P @ L @ D @ L.H @ P.T
-    print('S_bk', S_bk)
-    print('D', D)
-    print('L', L)
-    print('P', P)
+    #print('S_bk', S_bk)
+    #print('D', D)
+    #print('L', L)
+    #print('P', P)
     lambdas, U = np.linalg.eig(D)
     #Q = sort_by_permutation(lambdas)
-    print('lambdas', lambdas)
+    #print('lambdas', lambdas)
     l1 = [1. / math.sqrt(lambdas[i]) if i < r else 0 for i in range(len(lambdas)) ]
     #print('Q', Q)
     #print('res', np.dot(np.dot(Q, np.diag(lambdas)), Q.T))
     B = A @ P @ inv(L.H) @ U @ np.diag(l1)
-    B = B[:, :r]
+    B = B[:r, :r]
     lambdas, U = lambdas[:r], U[:r]
 
-    print('B', B)
-    print('Er', B.H @ B)
-    V = np.matrix(np.random.rand(A.shape[0], A.shape[0]))
-    V[:B.shape[0], :B.shape[1]] = B
-    print('V', V @ V.H)
+    #print('B', B)
+    #print('Er', B.H @ B)
+    V = np.zeros((A.shape[0], A.shape[0]))
+    V[:r, :r] = B
+    V[r:, :] = np.random.rand(A.shape[0] - r, A.shape[0])
+    #print(V.shape)
+#    V[:, r] = [1, 0, 0]
 
-    C = np.matrix(np.random.rand(A.shape[1], A.shape[1]))
+    V = np.matrix(V)
+    #print('V', V.H @ V)
+
+    C = np.matrix(np.zeros((A.shape[1], A.shape[1])))
     C[:U.shape[0], :U.shape[1]] = U
+    #C[r, :] = [0., 0., 0., 1.]
+    #print('C', C.H @ C)
+
     sigma = np.zeros(min(A.shape))
+    #print('sigma', lambdas)
+
     sigma[:r] = [math.sqrt(l) for l in lambdas]
+    #print('sigma sqrt', sigma)
 
     Q = sort_by_permutation(sigma)
     sigma = np.diag(sigma)
@@ -149,23 +180,74 @@ if __name__ == '__main__':
     Q2 = np.eye(A.shape[1], A.shape[1])
     Sigma = np.eye(A.shape[0], A.shape[1])
 
-    Sigma[:r, :r] = sigma
+    Sigma[:r, :r] = sigma[:r, :r]
     Q1[:Q.shape[0], :Q.shape[1]] = Q
     Q2[:Q.shape[0], :Q.shape[1]] = Q.T
 
 #    A_ = V @ Q1.T @ (Q1 @ Sigma @ Q2) @ Q2.T @ W_inv
-    rk = len(S)
     Sigma = (Q1 @ Sigma @ Q2)
-    print('sigma', Sigma)
-    print('svd', np.linalg.svd(A)[1])
+    #print('sigma sort', Sigma)
+
+    #print('singular', np.linalg.svd(A)[1])
+    #print(V.shape, Q1.T.shape)
     V = V @ Q1.T
     W_inv = Q2.T @ W_inv
-    t = Tensor(A)
-    for i in range(len(Sigma), 0, -1):
-        A1 = V[:, :i] @ Sigma[:i, :i] @ W_inv[:i, :]
-        print(A1, '\n')
-        E = np.array(A - A1)
-        print(np.sum(np.sum(E * E)) ** 0.5)
+    print('BK in {} secs\n'.format(time.time() - start))
 
-    print(A)
+    t = Tensor(A)
+    f = t.frobenius_norm(A)
+    start = time.time()
+    s1, s2, s3 = np.linalg.svd(A)
+    print('SVD in {} secs\n'.format(time.time() - start))
+    s2 = np.diag(s2)
+    es_bk = []
+    es_svd = []
+    r_bk = []
+    r_svd = []
+    for i in range(V.shape[1], 0, -1):
+        A1 = V[:, :i] @ Sigma[:i, :i] @ W_inv[:i, :]
+        A2 = s1[:, :i] @ s2[:i, :i] @ s3[:i, :]
+        #print(A1, '\n', A2, '\n')
+        E = np.array(A - A1)
+        E2 = np.array(A - A2)
+        e1 = np.sum(np.sum(E * E)) ** 0.5
+        e2 = np.sum(np.sum(E2 * E2)) ** 0.5
+        if i > 9:
+            print(V.shape[1] - i, 'bk: %2f' % e1, 'svd: %2f' % e2)
+            print(' rel: %2f' % (e1 / f), ' rel: %2f' % (e2 / f))
+        else:
+            print(V.shape[1] - i, 'bk: %2f' % e1, ' svd: %2f' % e2)
+            print('  rel: %2f' % (e1 / f), ' rel: %2f' % (e2 / f))
+        es_bk.append(e1)
+        es_svd.append(e2)
+        r_bk.append(e1 / f)
+        r_svd.append(e2 / f)
+        #print('%2f' % (e1 / f))
+        #print('%2f' % (e2 / f))
+        print()
+    plt.plot(list(range(V.shape[1])), es_bk, sns.xkcd_rgb["amber"], label='ap', linewidth=3)
+    for p in range(V.shape[1]):
+        plt.plot([p], [es_bk[p]], 'o', color=sns.xkcd_rgb["dusty red"])
+    plt.plot(list(range(V.shape[1])), es_svd, sns.xkcd_rgb["medium green"], label='ap', linewidth=3)
+    for p in range(V.shape[1]):
+        plt.plot([p], [es_svd[p]], 'o', color=sns.xkcd_rgb["windows blue"])
+    plt.title('Error (Frobenius norm)')
+    p1 = mpatches.Patch(color=sns.xkcd_rgb["amber"], label='Bunch-Kaufman')
+    p2 = mpatches.Patch(color=sns.xkcd_rgb["medium green"], label='SVD')
+    plt.legend(handles=[p1, p2])
+    plt.show()
+
+    plt.plot(list(range(V.shape[1])), r_bk, sns.xkcd_rgb["amber"], label='ap', linewidth=3)
+    for p in range(V.shape[1]):
+        plt.plot([p], [r_bk[p]], 'o', color=sns.xkcd_rgb["dusty red"])
+    plt.plot(list(range(V.shape[1])), r_svd, sns.xkcd_rgb["medium green"], label='ap', linewidth=3)
+    for p in range(V.shape[1]):
+        plt.plot([p], [r_svd[p]], 'o', color=sns.xkcd_rgb["windows blue"])
+
+
+    plt.title('Relative error)')
+    plt.legend(handles=[p1, p2])
+    plt.show()
+
+    #print(A)
 

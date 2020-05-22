@@ -1,26 +1,67 @@
 import numpy as np
 from numpy.linalg import matrix_rank, inv
-import bunch_kaufman
 from scipy.linalg import pinv
 from tensorly import unfold
-import time
+import sys
+sys.path.append("/home/laneesra/PycharmProjects/Diplom/CNNs")
+from utils import timeit, logger
+from functools import reduce
 
 
-def timeit(func):
-    def timer(*args, **kwargs):
-        start = time.time()
-        res = func(*args, **kwargs)
-        print('{} in {} secs'. format(func.__name__, time.time() - start))
-        return res
-    return timer
+def prime_factors(n):
+    factors = []
+    while n % 2 == 0:
+        factors.append(2)
+        n = int(n / 2)
+
+    for i in range(3, n + 1, 2):
+        if n == 1:
+            break
+        while n % i == 0:
+            factors.append(i)
+            n /= i
+
+    factors.append(1)
+    return np.array(factors)
 
 
 class Tensor:
-    def __init__(self, ar):
-        self.T = np.array(ar)
+    def __init__(self, ar, from_matrix=False, d=None):
+        if from_matrix:
+            ar = np.array(ar)
+            assert(d is not None)
+            m_fs, n_fs = prime_factors(ar.shape[0]), prime_factors(ar.shape[1])
+            print(n_fs)
+            #d = min([d, len(m_fs), len(n_fs)])
+            #print('init d', d)
+            #step_m, step_n = len(m_fs) // d, len(n_fs) // d
+
+            #ms = [reduce(lambda a, b: a * b, m_fs[i * step_m:(i + 1) * step_m]) if i != d - 1 else
+            #      reduce(lambda a, b: a * b, m_fs[i * step_m:]) for i in range(d)]
+            #ns = [reduce(lambda a, b: a * b, n_fs[i * step_n:(i + 1) * step_n]) if i != d - 1 else
+            #      reduce(lambda a, b: a * b, n_fs[i * step_n:]) for i in range(d)]
+            if d == 8: # 2^13 and 2^14
+                ms = [2, 2, 4, 4, 4, 4, 2, 2]
+                print(reduce(lambda a, b: a * b, ms))
+                ns = [4, 4, 2, 2, 2, 2, 4, 4]
+                print(reduce(lambda a, b: a * b, ns))
+            elif d == 6:
+                ms = [4, 4, 4, 4, 4, 4]
+                ns = [4, 4, 4, 4, 4, 4]
+            elif d == 4:
+                ms = [8, 8, 8, 8]
+                ns = [4, 4, 4, 4]
+
+            self.T = ar.reshape(np.array(ms) * np.array(ns))
+            print('new shape', self.T.shape)
+        else:
+            self.T = np.array(ar)
 
     def frobenius_norm(self, A):
         return np.sum(np.sum(A * A)) ** 0.5
+
+    def relative_error(self, T_):
+        return self.frobenius_norm(self.T - T_) / self.frobenius_norm(self.T)
 
     @timeit
     def tt_factorization(self, eps, factor='svd'):
@@ -30,41 +71,62 @@ class Tensor:
         r[0] = 1
         n = self.T.shape
         G = []
-        delta = eps / (d - 1) ** 0.5 * self.frobenius_norm(self.T)
+        delta = eps / ((d - 1) ** 0.5) * self.frobenius_norm(self.T)
         C = self.T.copy()
 
         for k in range(1, d):
-            C = C.reshape((r[k - 1] * n[k], int(N / (r[k - 1] * n[k]))))
+            C = C.reshape((r[k - 1] * n[k], int(float(N) / (r[k - 1] * n[k]))))
             U, S, Vt, rk = self.low_rank_approximation(C, delta, factor)
             r[k] = rk
             G.append(U.reshape(r[k - 1], n[k], r[k]))
-            if factor == 'svd':
-                C = np.dot(np.diag(S), Vt)
-            else:
-                C = np.dot(S, Vt)
-            N = (N * r[k]) / (n[k] * r[k - 1])
+            C = np.dot(S, Vt)
+            N = float(N * r[k]) / (n[k] * r[k - 1])
         G.append(C)
-        tt = G[0]
-        for i in range(1, len(G)):
-            tt = np.tensordot(tt, G[i], [len(tt.shape) - 1, 0])
-        return tt[0].reshape(self.T.shape)
+        G[0] = G[0].reshape(G[0].shape[1:])
+        print('ranks', r)
+        return G
+
+    @timeit
+    def tt_with_ranks(self, tt_ranks):
+        d = len(self.T.shape)
+        n = np.array(self.T.shape)
+        core = np.zeros(np.sum(tt_ranks[:-1] * n * tt_ranks[1:]), dtype='float32')
+        C = self.T.copy()
+        pos = 0
+        for k in range(1, d):
+            logger.info(f'k: {k}')
+            C = C.reshape((tt_ranks[k - 1] * n[k - 1], -1))
+            U, S, Vt = np.linalg.svd(C, full_matrices=False)
+            U = U[:, :tt_ranks[k]]
+            S = np.diag(S[:tt_ranks[k]])
+            Vt = Vt[:tt_ranks[k], :]
+
+            step = tt_ranks[k - 1] * n[k - 1] * tt_ranks[k]
+            core[pos:pos + step] = U.ravel()
+            pos += step
+            C = np.dot(S, Vt)
+
+        core[pos:] = C.ravel()
+        return core
 
     def low_rank_approximation(self, A, delta, factor='svd'):
         assert(factor in ['svd', 'aca'])
-
         if factor == 'svd':
             U, S, Vt = np.linalg.svd(A, full_matrices=False)
             rk = len(S)
-            for i in range(len(S), 0, -1):
-                A1 = np.dot(np.dot(U[:, :i], np.diag(S[:i])), Vt[:i, :])
+            step = 1 if len(S) < 500 else len(S) // 100
+            S = np.diag(S)
+
+            for i in range(S.shape[0], 1, -step):
+                A1 = U[:, :i] @ S[:i, :i] @ Vt[:i, :]
                 E = A - A1
                 if self.frobenius_norm(E) > delta:
                     rk = i + 1
                     break
-            return U[:, :rk], S[:rk], Vt[:rk, :], rk
+            return U[:, :rk], S[:rk, :rk], Vt[:rk, :], rk
 
         elif factor == 'aca':
-            C, G, R = self.adaptive_cross_approximation(A, delta)
+            C, G, R = self.adaptive_cross_approximation(A, 0.5)
             rk = np.min(G.shape)
             return C[:, :rk], inv(G[:rk, :rk]), R[:rk, :], rk
 
@@ -138,7 +200,6 @@ class Tensor:
 
         while iter < maxiter:
             iter += 1
-
             for n in range(N):
                 V = self.uttkrp(As, n)
                 Z = np.ones((rank, rank), dtype=np.float32)
@@ -153,7 +214,8 @@ class Tensor:
                     lambdas = A_cur.max(axis=0)
                     lambdas[lambdas < 1] = 1
                 As[n] = A_cur / lambdas
-
+        for a in As:
+            print('A shape', a.shape)
         if ret_tensors:
             return lambdas, As
 
@@ -184,15 +246,16 @@ class Tensor:
         return samples
 
     @timeit
-    def cp_rand(self, rank, init='random', maxiter=300, ret_tensors=False):
+    def cp_rand(self, rank, init='random', maxiter=500, ret_tensors=False):
         N = self.T.ndim
         As = self.init_factors(N, rank, init)
         iter = 0
         lambdas = np.ones(rank)
-        num_samples = max(self.T.shape) * 10
-
+        num_samples = int(10 * rank * np.log(rank)) #max(self.T.shape) * 10
+        print('num_samples', num_samples)
         while iter < maxiter:
             iter += 1
+
             for n in range(N):
                 s_idxs = self.get_samples(As, n, num_samples=num_samples)
                 Z = self.sampled_khatri_rao(s_idxs, As, n)
