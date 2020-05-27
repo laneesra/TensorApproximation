@@ -7,7 +7,6 @@ from scipy.linalg import orth
 import seaborn as sns
 import matplotlib.pyplot as plt
 sns.set()
-from tensor import Tensor
 import matplotlib.patches as mpatches
 
 
@@ -137,7 +136,7 @@ if __name__ == '__main__':
     r = np.linalg.matrix_rank(A)
     #print(r)
     S_bk = P @ L @ D @ L.H @ P.T
-    #print('S_bk', S_bk)
+    print('S_bk', np.linalg.norm(S_bk - S, 'fro'))
     #print('D', D)
     #print('L', L)
     #print('P', P)
@@ -250,4 +249,3 @@ if __name__ == '__main__':
     plt.show()
 
     #print(A)
-

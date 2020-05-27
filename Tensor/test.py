@@ -15,9 +15,9 @@ from svd import svd
 
 def test_full_tt_svd():
     np.random.seed(1234)
-    W = np.random.rand(256, 256).astype(np.float32)
-    tensor = Tensor(W, from_matrix=True, d=4)
-    Gs = tensor.tt_factorization(0.7)
+    W = np.random.rand(4096, 4096).astype(np.float32)
+    tensor = Tensor(W, from_matrix=True, d=6)
+    Gs = tensor.tt_factorization(0.1)
 
     sum = 1
     for s in tensor.T.shape:
@@ -104,7 +104,7 @@ def test_tt():
         tt = np.tensordot(tt, decomposed_tt[i], [len(tt.shape) - 1, 0])
         print(tt.shape)
     print('tt-svd error', tensor.frobenius_norm(A - tt.reshape(A.shape)))
-test_tt()
+test_full_tt_svd()
 '''A = np.zeros((3, 4, 2))
 A[:, :, 0] = [[ 1,  4,  7, 10], [ 2,  5,  8, 11], [3,  6,  9, 12]]
 A[:, :, 1] = [[13, 16, 19, 22], [14, 17, 20, 23], [15, 18, 21, 24]]
