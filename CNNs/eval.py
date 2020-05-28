@@ -4,6 +4,8 @@ import time
 import torch
 import torchvision.datasets as datasets
 from utils import timeit, logger
+import numpy as np
+from torch.utils.data.sampler import SubsetRandomSampler
 
 
 def normalize_img(img):
@@ -46,7 +48,15 @@ def load_test_dataset(path, batch_size=64, num_workers=1, pin_memory=True):
                                      transforms.ToTensor(),
                                      normalize,
                                  ]))
+
+        num_test = len(test_data)
+        indices = list(range(num_test))
+        np.random.seed(1234)
+        np.random.shuffle(indices)
+        test_sampler = SubsetRandomSampler(indices)
+
         test_loader = torch.utils.data.DataLoader(test_data,
+                                                  sampler=test_sampler,
                                                  batch_size=batch_size,
                                                  num_workers=num_workers,
                                                  pin_memory=pin_memory
@@ -77,8 +87,8 @@ def predict_loader(model, loader, device, batch_size=64):
                 break
 
     accuracy = 100 * float(correct) / total
-    logger.info(f'Mean time per image: {100 * float(all_time) / total}' )
-
+    mean_time = float(all_time) / total
+    logger.info(f'Mean time per image: {mean_time}' )
     logger.info(f'Accuracy of the network on the {total} test images: %d %%' % (accuracy))
     return accuracy
 

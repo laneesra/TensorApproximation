@@ -1,31 +1,22 @@
 import torch
 import numpy as np
 import sys
-import random
 import matplotlib.pyplot as plt
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
-sys.path.append("/content/drive/My Drive/TensorNet/TensorTrain")
+sys.path.append("../Tensor")
 from torch.utils.data.sampler import SubsetRandomSampler
-from utils import timeit, logger
-import time
+from utils import logger
 from torch.optim.lr_scheduler import StepLR
 
 
 class Trainer:
-    """
-    all models are trained by ImageNet dataset
-    todo:
-     add config file
-    """
-
     def __init__(self, args, model):
         self.verbose = args.verbose
         self.model = model
         self.path = f'models/{args.model}.pth'
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        # self.device = torch.device('cuda')
         if self.verbose:
             logger.debug('model {} loaded'.format(args.model))
 
@@ -34,9 +25,10 @@ class Trainer:
         self.criterion = torch.nn.CrossEntropyLoss()
         learning_rate = 0.1
         self.optimizer = torch.optim.SGD(model.classifier.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
+        #self.optimizer = torch.optim.Adam(model.classifier.parameters(), lr=0.0001)
+
         self.scheduler = StepLR(self.optimizer, step_size=10, gamma=0.1)
 
-        #self.optimizer = torch.optim.Adam(model.classifier.parameters(), lr=0.0001)
         logger.info(self.optimizer)
         logger.info(self.criterion)
         self.model.cuda()
@@ -91,14 +83,11 @@ class Trainer:
             test_acc = 0
             steps = 0
             self.scheduler.step()
-            # Print Learning Rate
             logger.info(f'Epoch: {epoch} LR: {self.scheduler.get_lr()}')
 
             for inputs, labels in self.train_loader:
                 steps += 1
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
-
-                # zero the parameter gradients
                 self.optimizer.zero_grad()
 
                 # forward + backward + optimize
@@ -137,6 +126,7 @@ class Trainer:
             logger.info(f"Epoch {epoch + 1}/{self.num_epochs}.. "
                         f"Train loss: {running_loss / total_steps}.. ")
             torch.save(self.model, self.path.replace('.pth', f'_epoch_{epoch}.pth'))
+
         self.train_losses = train_losses
         self.test_losses = test_losses
         self.accuracy = test_accuracy
@@ -151,6 +141,3 @@ class Trainer:
         plt.legend(frameon=False)
         plt.savefig('training.png')
         plt.show()
-
-    def fine_tune(self):
-        pass

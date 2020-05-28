@@ -1,21 +1,21 @@
 import argparse
-import sys
 from cnn import CNN
 from trainer import Trainer
 from decomposer import Decomposer
 from eval import predict, load_img, predict_loader, load_test_dataset
+from utils import logger, device_name
 import torch
 from torchsummary import summary
-
-sys.path.append("/home/laneesra/PycharmProjects/Diplom/TensorTrain")
+from collections import defaultdict
 '''
-num of images 25024
+num of images 1024
 
 original:
-2020-05-22 20:02:32,718 - Tensoring Nets - INFO - Mean time per image: 2.1943747562572753
-2020-05-22 20:02:32,718 - Tensoring Nets - INFO - Accuracy of the network on the 7267 test images: 91 %
-2020-05-22 20:02:32,718 - Tensoring Nets - INFO - predict_loader in 160.02049684524536 secs
-accuracy: 91.15178202834733
+2020-05-24 00:33:42,349 - Tensoring Nets - INFO - Mean time per image: 0.018633527914062142
+2020-05-24 00:33:42,349 - Tensoring Nets - INFO - Accuracy of the network on the 1024 test images: 92 %
+2020-05-24 00:33:42,350 - Tensoring Nets - INFO - predict_loader in 22.04084873199463 secs
+accuracy: 92.87109375
+
 
 cp layer=3 r=140:
 Mean time per image: 1.8603774233863066
@@ -65,7 +65,7 @@ def parse_args():
     parser.add_argument("--eval", dest="eval", action="store_true")
     parser.add_argument("--train_path", type=str, default="train")
     parser.add_argument("--test_path", type=str, default="test")
-    parser.add_argument("--verbose", dest="verbose", action="store_true", default=True)
+    parser.add_argument("--verbose", '-v', dest="verbose", action="store_true", default=False)
 
     return parser.parse_args()
 
@@ -83,44 +83,63 @@ if __name__ == '__main__':
         model = torch.load(path_i)
         decomposer = Decomposer(args, model)
         decomposer.run()
-        decomposer.replace_layer(keys=args.key, type=args.type)
+        if args.type == 'fc':
+            params = defaultdict(dict)
+            for k in args.key:
+                params[k]['d'] = 6
+                params[k]['tt_ranks'] = [1, 8, 8, 8, 8, 8, 1]
+
+            decomposer.replace_layer(keys=args.key, type=args.type, params=params)
+        else:
+            decomposer.replace_layer(keys=args.key, type=args.type)
+
         path_o = f'/home/laneesra/PycharmProjects/Diplom/CNNs/models/{args.model}_{args.factorization}_{args.key}_{args.type}.pth'
         torch.save(decomposer.model, path_o)
-        print('===========saved============')
+        logger.info('===========saved============')
+        logger.info(f'saved to {path_o}')
 
     elif args.eval:
-        if args.factorization != 'none':
-            path = f'/home/laneesra/PycharmProjects/Diplom/CNNs/models/{args.model}_{args.factorization}_{args.key}_{args.type}.pth'
-        else:
-            path = f'/home/laneesra/PycharmProjects/Diplom/CNNs/models/{args.model}.pth'
-        path = "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_tt.pth"
+        path = f'/home/laneesra/PycharmProjects/Diplom/CNNs/models/{args.model}.pth'
+        #path = "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_tt.pth"
         #path = "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet.pth"
         #path = "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_4_linear.pth"
-        #path = "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_3_conv.pth"
+        #path = "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_epoch_11.pth"
+        #path = "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_36.pth"
 
-        print('model:', path)
-        model = torch.load(path)
-        model.eval()
+        paths = ["/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet.pth",
+                "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_tt_['4']_fc.pth",
+                 "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_['3']_conv.pth",
+                 "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_['6']_conv.pth",
+                 "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_['8']_conv.pth",
+                 "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_36.pth",
+                 "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_['3', '6', '8']_conv.pth",
+                "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_['3']_conv_tt_['4']_fc.pth",
+                "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_36_tt_['4']_fc.pth",
+                "/home/laneesra/PycharmProjects/Diplom/CNNs/models/alexnet_cp_['3', '6', '8']_conv_tt_['4']_fc.pth"]
 
-        device = 'cuda'
-        if device == 'cpu':
-            model.cpu()
-            use_cuda = False
-            device = torch.device("cpu")
-            summary(model, (3, 224, 224), device='cpu')
-        else:
-            model.cuda()
-            use_cuda = True
-            device = torch.device("cuda")
-            summary(model, (3, 224, 224), device='cuda')
+        for path in paths:
+            logger.info(f'model: {path}')
+            model = torch.load(path)
+            model.eval()
 
-        labels = ['cat', 'dog']
-        #img1 = load_img('/home/laneesra/PycharmProjects/Diplom/CNNs/data/6zE76PpELRY.jpg')
-        #img2 = load_img('/home/laneesra/PycharmProjects/Diplom/CNNs/data/photo_2020-05-04_13-55-56.jpg')
-        #img3 = load_img('/home/laneesra/PycharmProjects/Diplom/CNNs/data/photo_2020-05-04_13-56-08.jpg')
-        #for img in [img1, img2, img3]:
-        #    pred = predict(model, labels, img, device, use_cuda)
-        #    print(f'predict is {pred}')
-        test_loader = load_test_dataset(args.test_path)
-        accuracy = predict_loader(model, test_loader, device=device)
-        print('accuracy:', accuracy)
+            if device_name == 'cpu':
+                model.cpu()
+                use_cuda = False
+
+            else:
+                model.cuda()
+                use_cuda = True
+
+            device = torch.device(device_name)
+            summary(model, (3, 224, 224), device=device_name)
+
+            labels = ['cat', 'dog']
+            img1 = load_img('data/6zE76PpELRY.jpg')
+            img2 = load_img('data/photo_2020-05-04_13-55-56.jpg')
+            img3 = load_img('data/photo_2020-05-04_13-56-08.jpg')
+            for img in [img1, img2, img3]:
+                pred = predict(model, labels, img, device, use_cuda)
+                logger.info(f'predict is {pred}')
+        #test_loader = load_test_dataset(args.test_path)
+        #accuracy = predict_loader(model, test_loader, device=device)
+        #print('accuracy:', accuracy)

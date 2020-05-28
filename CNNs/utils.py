@@ -2,6 +2,20 @@ import time
 import logging
 import torch
 
+from itertools import repeat
+from torch._six import container_abcs
+
+
+def _ntuple(n):
+    def parse(x):
+        if isinstance(x, container_abcs.Iterable):
+            return x
+        return tuple(repeat(x, n))
+    return parse
+
+_pair = _ntuple(2)
+
+
 def timeit(func):
     def timer(*args, **kwargs):
         start = time.time()
@@ -24,17 +38,6 @@ fh.setFormatter(formatter)
 logger.addHandler(fh)
 logger.setLevel(LOG_LEVEL)
 
-device = torch.device("cuda")
-
-import numpy as np
-
-
-def matvec(M, N):
-    logger.info(str(M.shape) + str(N.shape))
-    assert (N.shape[1] == 1)
-    res = np.zeros((N.shape[1], M.shape[0]))
-    for i in range(M.shape[0]):
-        for j in range(M.shape[1]):
-            res[0][i] += M[i][j] * N[j][0]
-    return res
+device_name = 'cpu'
+device = torch.device(device_name)
 

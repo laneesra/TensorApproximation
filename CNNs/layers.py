@@ -1,8 +1,9 @@
 from torch import nn, randn, Tensor, matmul, from_numpy, add
+from torch.nn import functional as F
 import numpy as np
 import math
 
-from utils import timeit
+from utils import timeit, _pair
 
 
 class LinearLayer(nn.Module):
@@ -60,7 +61,7 @@ class TTLayer(nn.Module):
         else:
             self.register_parameter('bias', None)
 
-    @timeit
+    #@timeit
     def forward(self, input):
         res = input
         pos = 0
@@ -82,5 +83,67 @@ class TTLayer(nn.Module):
         )
 
     def init_cores(self):
-        cores = np.load('data/tt_fc_4_alexnet_cores.npy', allow_pickle=True)
+        cores = np.load('../CNNs/data/tt_fc_4_alexnet_cores.npy', allow_pickle=True)
+        return cores
+
+
+class TTConvLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, weights=None,
+                 stride=1, padding=0, dilation=1, groups=1,
+                 bias=True, padding_mode='zeros'):
+        super(TTConvLayer, self).__init__()
+        kernel_size = _pair(kernel_size)
+        stride = _pair(stride)
+        padding = _pair(padding)
+        dilation = _pair(dilation)
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.dilation = dilation
+        self.groups = groups
+        self.padding_mode = padding_mode
+        self._reversed_padding_repeated_twice = tuple(x for x in reversed(self.padding) for _ in range(2))
+
+        if weights is None:
+            weights = self.init_cores()
+        self.weight = []
+        for w in weights:
+            w_p = nn.Parameter(Tensor(w.shape))
+            w_p.requires_grad = True
+            w_p.data = from_numpy(w)
+            self.weight.append(w_p)
+
+        if bias:
+            self.bias = nn.Parameter(Tensor(out_channels))
+            self.bias.requires_grad = True
+            bound = 1.0 / np.sqrt(len(self.weight))
+            nn.init.uniform_(self.bias, -bound, bound)
+        else:
+            self.register_parameter('bias', None)
+
+    @timeit
+    def forward(self, input):
+        #few parameters but too long
+        w = self.weight[0].data
+        for i in range(1, len(self.weight)):
+            w = np.tensordot(w, self.weight[i].data, [len(w.shape) - 1, 0])
+        w = w.reshape((w.shape[3], w.shape[0], w.shape[1], w.shape[2]))
+        w_t = Tensor(w.shape)
+        w_t.data = from_numpy(w)
+        if self.padding_mode != 'zeros':
+            return F.conv2d(F.pad(input, self._reversed_padding_repeated_twice, mode=self.padding_mode),
+                            Tensor(w_t), self.bias, self.stride,
+                            _pair(0), self.dilation, self.groups)
+        return F.conv2d(input, Tensor(w_t), self.bias, self.stride,
+                        self.padding, self.dilation, self.groups)
+
+    def extra_repr(self):
+        return '{}, {}, kernel_size={}, stride={}, padding={}'.format(
+            self.in_channels, self.out_channels, self.kernel_size, self.stride, self.padding
+        )
+
+    def init_cores(self):
+        cores = np.load('data/tt_conv_3_alexnet_cores.npy', allow_pickle=True)
         return cores
