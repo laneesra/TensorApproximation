@@ -32,8 +32,6 @@ def parse_args():
     parser.add_argument("--test_path", type=str, default="data/test")
     parser.add_argument("--device", type=str, default="cpu", help='gpu or cpu usage')
     parser.add_argument("--epochs", type=int, default=10, help='number of epochs for training')
-    parser.add_argument("--device", type=str, default="cpu", help='gpu or cpu usage')
-
     parser.add_argument('-v', "--verbose", dest="verbose", action="store_true", default=False)
 
     return parser.parse_args()
