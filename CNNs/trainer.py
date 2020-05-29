@@ -20,7 +20,7 @@ class Trainer:
         if self.verbose:
             logger.debug('model {} loaded'.format(args.model))
 
-        self.num_epochs = 100
+        self.num_epochs = args.epochs
         self.train_loader, self.test_loader = self.load_dataset(args.train_path)
         self.criterion = torch.nn.CrossEntropyLoss()
         learning_rate = 0.1

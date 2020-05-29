@@ -6,6 +6,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 sns.set()
 import matplotlib.patches as mpatches
+from scipy.stats import unitary_group, ortho_group
+from sklearn.datasets import make_spd_matrix, make_sparse_spd_matrix
+import scipy.linalg as sp
 
 
 def bunch_kaufman(A):
@@ -161,7 +164,6 @@ def truncated_bk(A):
     sigma[:r] = [np.sqrt(l) if l > 0 else 0 for l in lambdas ]
     Q = sort_by_permutation(sigma)
     sigma = np.diag(sigma)
-
     W_inv = C.H @ L_h @ P.T
 
     Q1 = np.eye(A.shape[0], A.shape[0])
@@ -177,21 +179,10 @@ def truncated_bk(A):
     return np.array(V), np.array(Sigma), np.array(W_inv)
 
 
-from scipy.stats import unitary_group, ortho_group
-from sklearn.datasets import make_spd_matrix, make_sparse_spd_matrix
-import scipy.linalg as sp
 if __name__ == '__main__':
     n = 500
     A = np.random.rand(n, n)
-    #A = np.dot(A.T, A)
     k = 500
-
-    #A = unitary_group.rvs(n)
-    #A = ortho_group.rvs(n)
-
-    #A = make_spd_matrix(n)
-    #A = sp.hadamard(128, dtype=complex)
-    #A = sp.toeplitz(np.random.rand(n), np.random.rand(n))
     start = time.time()
     V, S, W = truncated_bk(A)
     print('BK in {} secs\n'.format(time.time() - start))
@@ -212,7 +203,6 @@ if __name__ == '__main__':
     for i in range(S.shape[0], 0, -1):
         A1 = V[:, :i] @ S[:i, :i] @ W[:i, :]
         A2 = s1[:, :i] @ s2[:i, :i] @ s3[:i, :]
-        #print(A1, '\n', A2, '\n')
         E = np.array(A - A1)
         E2 = np.array(A - A2)
         e1 = np.linalg.norm(E, 'fro')
@@ -224,28 +214,14 @@ if __name__ == '__main__':
         r_svd.append(e2 / f * 100)
 
 
-    '''plt.plot(list(range(V.shape[1])), es_bk, sns.xkcd_rgb["amber"], label='ap', linewidth=3)
-    for p in range(V.shape[1]):
-        plt.plot([p], [es_bk[p]], 'o', color=sns.xkcd_rgb["amber"])
-    plt.plot(list(range(V.shape[1])), es_svd, sns.xkcd_rgb["medium green"], label='ap', linewidth=3)
-    for p in range(V.shape[1]):
-        plt.plot([p], [es_svd[p]], 'o', color=sns.xkcd_rgb["medium green"])'''
-    #plt.title('Error (Frobenius norm)')
     p1 = mpatches.Patch(color=sns.xkcd_rgb["amber"], label='BK')
     p2 = mpatches.Patch(color=sns.xkcd_rgb["medium green"], label='SVD')
-    #plt.legend(handles=[p1, p2])
-    #plt.show()
     plt.plot(list(range(k)), r_bk[:k], sns.xkcd_rgb["amber"], label='ap', linewidth=3)
-    #for p in range(k):
-    #    plt.plot([p], [r_bk[p]], 'o', color=sns.xkcd_rgb["amber"])
     plt.plot(list(range(k)), r_svd[:k], sns.xkcd_rgb["medium green"], label='ap', linewidth=3)
-    #for p in range(k):
-    #    plt.plot([p], [r_svd[p]], 'o', color=sns.xkcd_rgb["medium green"])
 
     plt.ylabel('Ошибка аппроксимации, %')
     plt.xlabel('Усеченный ранг r')
     plt.legend(handles=[p1, p2])
     plt.show()
 
-    #print(A)
 

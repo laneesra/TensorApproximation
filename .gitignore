@@ -1,5 +1,10 @@
 Tensor/bk.py
-Tensor/.idea*
+Tensor/cp_als.py
+Tensor/svd.py
+Tensor/test.py
+Tensor/.idea/
 TensorTrain/
+Tensor/.ipynb_checkpoints/
+CNNs/data/imagenet_classes.txt
 .idea/*
 

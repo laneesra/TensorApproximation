@@ -131,7 +131,7 @@ class Tensor:
             return U[:, :rk], np.diag(S[:rk]), Vt[:rk, :], rk
 
         elif factor == 'aca':
-            C, G, R = self.adaptive_cross_approximation(A, 0.5)
+            C, G, R = self.adaptive_cross_approximation(A, delta)
             rk = np.min(G.shape)
             return C[:, :rk], inv(G[:rk, :rk]), R[:rk, :], rk
 

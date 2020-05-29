@@ -4,11 +4,11 @@ sys.path.append("../Tensor")
 from utils import timeit, logger, device, device_name
 from tensor import Tensor
 from torch import nn, tensor
-from sklearn.utils.extmath import randomized_svd
 from layers import TTLayer, LinearLayer, TTConvLayer
 
 
 class Decomposer:
+    """Decompose layers by tensor decompositon"""
     def __init__(self, args, model):
         self.verbose = args.verbose
         self.model = model

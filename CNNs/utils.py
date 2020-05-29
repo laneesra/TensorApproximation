@@ -5,15 +5,12 @@ import torch
 from itertools import repeat
 from torch._six import container_abcs
 
+def parse(x):
+    if isinstance(x, container_abcs.Iterable):
+        return x
+    return tuple(repeat(x, 2))
 
-def _ntuple(n):
-    def parse(x):
-        if isinstance(x, container_abcs.Iterable):
-            return x
-        return tuple(repeat(x, n))
-    return parse
-
-_pair = _ntuple(2)
+_pair = parse
 
 
 def timeit(func):

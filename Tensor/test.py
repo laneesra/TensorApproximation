@@ -214,16 +214,16 @@ def test_cp():
     plt.show()
 
 def test_tt_bk():
-    A = np.random.rand(3, 10, 5).astype(np.float32)
+    A = np.random.rand(3, 10, 10).astype(np.float32)
     tensor = Tensor(A)
-    decomposed_tt = tensor.tt_factorization(1, factor='bk')
+    decomposed_tt = tensor.tt_factorization(0.01, factor='aca')
     for d in decomposed_tt:
         print(d.shape)
     tt = decomposed_tt[0]
     for i in range(1, len(decomposed_tt)):
         tt = np.tensordot(tt, decomposed_tt[i], [len(tt.shape) - 1, 0])
     print('tt-svd error', tensor.frobenius_norm(A - tt.reshape(A.shape)))
-    decomposed_tt = tensor.tt_factorization(1, factor='svd')
+    decomposed_tt = tensor.tt_factorization(0.01, factor='svd')
     for d in decomposed_tt:
         print(d.shape)
     tt = decomposed_tt[0]
@@ -265,7 +265,7 @@ def view_results():
     plt.show()
 
 #test_tt_bk()
-test_time()
+test_tt_bk()
 '''A = np.zeros((3, 4, 2))
 A[:, :, 0] = [[ 1,  4,  7, 10], [ 2,  5,  8, 11], [3,  6,  9, 12]]
 A[:, :, 1] = [[13, 16, 19, 22], [14, 17, 20, 23], [15, 18, 21, 24]]
