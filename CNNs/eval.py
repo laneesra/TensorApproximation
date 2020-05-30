@@ -78,10 +78,10 @@ def predict_loader(model, loader, device, verbose, batch_size=64):
             start = time.time()
             if verbose:
                 with torch.autograd.profiler.profile(use_cuda=False) as prof:
-                    outputs = model(batch)
+                    outputs = model(inputs)
                 print(prof)
             else:
-                outputs = model(batch)
+                outputs = model(inputs)
             t = time.time() - start
             logger.info(f'time: {t}')
             all_time += t
