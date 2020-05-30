@@ -4,7 +4,7 @@ sys.path.append("../Tensor")
 from utils import timeit, logger, device, device_name
 from tensor import Tensor
 from torch import nn, tensor
-from layers import TTLayer, LinearLayer, TTConvLayer
+from cnn import TTLayer, LinearLayer, TTConvLayer
 
 
 class Decomposer:

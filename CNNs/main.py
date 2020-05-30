@@ -85,5 +85,5 @@ if __name__ == '__main__':
 
         labels = ['cat', 'dog']
         test_loader = load_test_dataset(args.test_path)
-        accuracy = predict_loader(model, test_loader, device=device)
+        accuracy = predict_loader(model, test_loader, device, args.verbose)
         print('accuracy:', accuracy)
