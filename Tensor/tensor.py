@@ -121,10 +121,10 @@ class Tensor:
             U, S, Vt = np.linalg.svd(A, full_matrices=False)
 
             rk = len(S)
-            er = np.sum([s ** 2 for s in S])
+            er = 0
             delta *= delta
             for i in range(S.shape[0] - 1, 0, -1):
-                er -= S[i] ** 2
+                er += S[i] ** 2
                 if er > delta:
                     rk = i + 1
                     break
@@ -139,10 +139,10 @@ class Tensor:
             V, S, W = truncated_bk(A)
             rk = len(S)
             S = np.diag(S)
-            er = np.sum([s ** 2 for s in S])
+            er = 0
             delta *= delta / (W.shape[0] ** 2)
             for i in range(S.shape[0] - 1, 0, -1):
-                er -= S[i] ** 2
+                er += S[i] ** 2
                 if er > delta:
                     rk = i + 1
                     break
