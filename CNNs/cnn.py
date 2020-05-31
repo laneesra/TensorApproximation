@@ -28,7 +28,7 @@ class LinearLayer(nn.Module):
             bound = 1. / math.sqrt(fan_in)
             nn.init.uniform_(self.bias, -bound, bound)
 
-    @timeit
+    #@timeit
     def forward(self, input):
         res = matmul(input, self.weight.t())
         if self.bias is not None:

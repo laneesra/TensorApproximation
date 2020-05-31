@@ -37,7 +37,7 @@ def predict(model, labels, batch, device, use_cuda):
     return labels[top_class]
 
 
-def load_test_dataset(path, batch_size=64, num_workers=1, pin_memory=True):
+def load_test_dataset(path, batch_size=1, num_workers=1, pin_memory=True):
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
         test_data = datasets.ImageFolder(path,
@@ -53,6 +53,7 @@ def load_test_dataset(path, batch_size=64, num_workers=1, pin_memory=True):
         indices = list(range(num_test))
         np.random.seed(1234)
         np.random.shuffle(indices)
+        indices = indices
         test_sampler = SubsetRandomSampler(indices)
 
         test_loader = torch.utils.data.DataLoader(test_data,
@@ -65,12 +66,13 @@ def load_test_dataset(path, batch_size=64, num_workers=1, pin_memory=True):
 
 
 @timeit
-def predict_loader(model, loader, device, verbose, batch_size=64):
+def predict_loader(model, loader, device, verbose, batch_size=1):
     print('num of batches', len(loader))
     print('num of images', len(loader) * batch_size)
     correct = 0
     total = 0
     all_time = 0
+    s = len(loader) * batch_size
 
     with torch.no_grad():
         for inputs, labels in loader:
@@ -83,7 +85,7 @@ def predict_loader(model, loader, device, verbose, batch_size=64):
             else:
                 outputs = model(inputs)
             t = time.time() - start
-            logger.info(f'time: {t}')
+            logger.info(f'{total} / {s} time: {t}')
             all_time += t
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
