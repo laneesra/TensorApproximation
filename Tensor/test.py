@@ -7,7 +7,7 @@ import torch
 import matplotlib.patches as mpatches
 
 sys.path.append("../CNNs")
-from layers import TTLayer, LinearLayer
+from cnn import TTLayer, LinearLayer
 
 from utils import timeit, logger
 from tensor import Tensor
@@ -216,7 +216,7 @@ def test_cp():
 def test_tt_bk():
     A = np.random.rand(3, 10, 10).astype(np.float32)
     tensor = Tensor(A)
-    decomposed_tt = tensor.tt_factorization(0.01, factor='aca')
+    decomposed_tt = tensor.tt_factorization(0.01, factor='bk')
     for d in decomposed_tt:
         print(d.shape)
     tt = decomposed_tt[0]
