@@ -200,7 +200,7 @@ class Tensor:
         return P
 
     @timeit
-    def cp_als(self, rank, ret_tensors=False, maxiter=00):
+    def cp_als(self, rank, ret_tensors=False, maxiter=300):
         N = self.T.ndim
         As = self.init_factors(N, rank)
         iter = 0
@@ -210,11 +210,11 @@ class Tensor:
             iter += 1
             for n in range(N):
                 Z = self.khatri_rao([As[i] for i in range(self.T.ndim) if i != n])
-                V = unfold(self.T, n).dot(Z)
-                Z = np.ones((rank, rank), dtype=np.float32)
+                W = unfold(self.T, n).dot(Z)
+                V = np.ones((rank, rank), dtype=np.float32)
                 for i in (list(range(n)) + list(range(n + 1, N))):
-                    Z = Z * np.dot(As[i].T, As[i])
-                A_cur = np.dot(V, pinv(Z))  # solve AZ=V
+                    V = V * np.dot(As[i].T, As[i])
+                A_cur = np.dot(W, pinv(V))  # solve AV=W
 
                 # normalize A update lambdas
                 if iter == 0:

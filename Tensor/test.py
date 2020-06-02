@@ -240,7 +240,7 @@ def view_results():
     names = ['ALEXNET', 'TT-4', 'CP-3', 'CP-6', 'CP-8', 'CP-3,6', 'CP-3,6,8', 'CP-3 TT-4',
              'CP-3,6 TT-4', 'CP-3,6,8 TT-4']
     params = [226.36, 162.36, 226.32, 224.61, 223.79, 224.57, 222, 162.32, 160.57, 158.01]
-    time = [82, 67, 59, 63, 59, 53, 42, 54, 49, 39]
+    time = [75, 67, 59, 63, 59, 53, 42, 54, 49, 39]
     d = {}
     filled_markers = ('o', 'v', '^', '<', 'X', '8', 's', 'p', 'P', 'h')
     d['size'] = params
@@ -251,11 +251,12 @@ def view_results():
     sns.scatterplot(x='size', y='time', style='Архитектура',
                     hue='Архитектура', data=df, markers=filled_markers, s=250)
     plt.xlabel('Размер, МБ')
-    plt.ylabel('Время выполнения, сек')
+    plt.ylabel('Время выполнения, ms')
     plt.rcParams["font.family"] = "Times New Roman"
     plt.rcParams["font.size"] = "70"
     plt.show()
 
+view_results()
 test_tt_bk()
 test_tt()
 test_cp()

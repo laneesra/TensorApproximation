@@ -15,4 +15,5 @@
 Выполнить в главной директории:
 <pre><code>unzip test.zip -d CNNs/data/ &&  unzip models.zip CNNs/
 </code></pre>
+Тестовый файл для класса тензора и результатов: <code>Tensor/test.py</code>
 
