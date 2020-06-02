@@ -13,6 +13,6 @@
 Скачать веса моделей alexnet, alexnet_cp, alexnet_tt и тестовые данные по ссылке:
 <pre>https://drive.google.com/drive/folders/1EMSnDLo4m_LeS_7M-JpURuptsmZvJyAY?usp=sharing</pre>
 Выполнить в главной директории:
-<pre><code>unzip test.zip CNNs/data/ &&  unzip models.zip CNNs/
+<pre><code>unzip test.zip -d CNNs/data/ &&  unzip models.zip CNNs/
 </code></pre>
 
