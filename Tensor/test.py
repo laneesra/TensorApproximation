@@ -51,7 +51,7 @@ def test_full_tt_svd():
     print('tt-svd error', tensor.relative_error(tt))
 
 
-def test_time():
+def test_tt_layer_time():
     weights = np.random.rand(4096, 4096).astype(np.float32)
     input = torch.Tensor((1, 4096))
     data = np.random.rand(1, 4096).astype(np.float32)
@@ -154,17 +154,17 @@ def test_tt():
     for i in range(1, len(decomposed_tt)):
         tt = np.tensordot(tt, decomposed_tt[i], [len(tt.shape) - 1, 0])
         print(tt.shape)
-    print(f'tt-aca error: {tensor.relative_error(tt.reshape(A.shape))} %')
+    print(f'tt-svd error: {tensor.relative_error(tt.reshape(A.shape))} %')
 
 def test_cp():
-    A = np.random.rand(10, 10, 7, 5).astype(np.float32)
+    A = np.random.rand(10, 7, 5).astype(np.float32)
     tensor = Tensor(A)
     times = []
     ers = []
     times_bk = []
     ers_bk = []
 
-    rks = [20, 40, 60, 80, 100]
+    rks = [5, 10, 20]
     for rk in rks:
         print(rk)
         start = time.time()
@@ -208,33 +208,6 @@ def test_cp():
     plt.legend(handles=[p1, p2])
     plt.show()
 
-def test_tt_bk():
-    A = np.random.rand(3, 10, 5).astype(np.float32)
-    tensor = Tensor(A)
-    decomposed_tt = tensor.tt_factorization(0.01, factor='aca')
-    for d in decomposed_tt:
-        print(d.shape)
-    tt = decomposed_tt[0]
-    for i in range(1, len(decomposed_tt)):
-        tt = np.tensordot(tt, decomposed_tt[i], [len(tt.shape) - 1, 0])
-    print(f'tt-aca error: {tensor.relative_error(tt.reshape(A.shape))} %')
-
-    decomposed_tt = tensor.tt_factorization(0.01, factor='svd')
-    for d in decomposed_tt:
-        print(d.shape)
-    tt = decomposed_tt[0]
-    for i in range(1, len(decomposed_tt)):
-        tt = np.tensordot(tt, decomposed_tt[i], [len(tt.shape) - 1, 0])
-    print(f'tt-svd error: {tensor.relative_error(tt.reshape(A.shape))} %')
-
-    decomposed_tt = tensor.tt_factorization(0.01, factor='bk')
-    for d in decomposed_tt:
-        print(d.shape)
-    tt = decomposed_tt[0]
-    for i in range(1, len(decomposed_tt)):
-        tt = np.tensordot(tt, decomposed_tt[i], [len(tt.shape) - 1, 0])
-    print(f'tt-bk error: {tensor.relative_error(tt.reshape(A.shape))} %')
-
 import pandas as pd
 def view_results():
     names = ['ALEXNET', 'TT-4', 'CP-3', 'CP-6', 'CP-8', 'CP-3,6', 'CP-3,6,8', 'CP-3 TT-4',
@@ -256,7 +229,14 @@ def view_results():
     plt.rcParams["font.size"] = "70"
     plt.show()
 
+print('================view results=================')
 view_results()
-test_tt_bk()
+
+print('=================test_tt================')
 test_tt()
+
+print('=================test_cp================')
 test_cp()
+
+print('=================test_tt_layer_time================')
+test_tt_layer_time()
